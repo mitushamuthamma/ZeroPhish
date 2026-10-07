@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>ZeroPhish</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f4f6f8; margin: 0; }
+    main { max-width: 420px; margin: 60px auto; background: #fff; padding: 28px; border-radius: 12px;
+           box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+    h1 { margin-top: 0; }
+    .hint { color: #555; font-size: 14px; }
+    input, button { width: 100%; box-sizing: border-box; padding: 10px; font-size: 16px; margin-top: 10px; }
+    button { background: #1a56db; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+    button.secondary { background: #e5e7eb; color: #111; }
+    button:disabled { opacity: .6; cursor: wait; }
+    hr { margin: 28px 0; border: 0; border-top: 1px solid #ddd; }
+    .message { min-height: 1.4em; margin-top: 14px; font-size: 14px; }
+    .ok { color: #0a7a2f; }
+    .error { color: #b42318; }
+    .site-box { background: #eef4ff; border: 1px solid #b6ccf5; border-radius: 8px; padding: 14px; margin: 14px 0; }
+    .site-box .label { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: .04em; }
+    .site-box .value { font-size: 18px; font-weight: 600; word-break: break-all; margin-bottom: 8px; }
+    .welcome { font-size: 20px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>ZeroPhish</h1>
+
+    <!-- VIEW 1: register + log in -->
+    <section id="auth-view">
+      <h2>Create account</h2>
+      <p class="hint">No password. Your browser makes a secret key that never leaves this device.</p>
+      <input id="reg-username" placeholder="Choose a username" autocomplete="off">
+      <button id="reg-button">Create account</button>
+      <p id="reg-message" class="message"></p>
+
+      <hr>
+
+      <h2>Log in</h2>
+      <p class="hint">Your browser signs a one-time challenge with its secret key. Nothing secret is sent.</p>
+      <input id="login-username" placeholder="Your username" autocomplete="off">
+      <button id="login-button">Log in</button>
+      <p id="login-message" class="message"></p>
+    </section>
+
+    <!-- VIEW 2: the "Approve login" prompt -->
+    <section id="approve-view" hidden>
+      <h2>Approve this login?</h2>
+      <p class="hint">Your browser will sign a one-time challenge for exactly this website address.
+        If the address below looks wrong, press Cancel.</p>
+      <div class="site-box">
+        <div class="label">Website</div>
+        <div class="value" id="approve-site"></div>
+        <div class="label">Account</div>
+        <div class="value" id="approve-user"></div>
+      </div>
+      <button id="approve-button">Approve</button>
+      <button id="cancel-button" class="secondary">Cancel</button>
+    </section>
+
+    <!-- VIEW 3: dashboard after login -->
+    <section id="dashboard-view" hidden>
+      <p class="welcome">&#9989; Logged in as <span id="dash-user"></span></p>
+      <p class="hint">No password was used. The server checked your signature against your public key.</p>
+
+      <!-- Delicia (Person 4): the sensitive-action form (change email / transfer funds) goes here -->
+      <div id="actions-area"></div>
+
+      <button id="logout-button" class="secondary">Log out</button>
+    </section>
+  </main>
+
+  <script src="zerophish.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const views = { auth: $("auth-view"), approve: $("approve-view"), dashboard: $("dashboard-view") };
+
+    function showView(name) {
+      for (const [key, element] of Object.entries(views)) element.hidden = key !== name;
+    }
+
+    function showMessage(element, text, isOk) {
+      element.textContent = text;            // textContent (not innerHTML) keeps server text harmless
+      element.className = "message " + (isOk ? "ok" : "error");
+    }
+
+    // Show the server's message AND its short error code (handy for screenshots and the demo).
+    function errorText(result) {
+      return result.error ? result.message + " [" + result.error + "]" : result.message;
+    }
+
+    function enterDashboard(username) {
+      $("dash-user").textContent = username;
+      showView("dashboard");
+    }
+
+    // ---- Register ----
+    $("reg-button").addEventListener("click", async () => {
+      const username = $("reg-username").value.trim();
+      if (!username) return showMessage($("reg-message"), "Please type a username.", false);
+
+      $("reg-button").disabled = true;
+      try {
+        const result = await ZP.register(username);
+        showMessage($("reg-message"), result.ok ? result.message : errorText(result), result.ok);
+      } catch (error) {
+        showMessage($("reg-message"), "Something went wrong: " + error.message, false);
+      }
+      $("reg-button").disabled = false;
+    });
+
+    // ---- Log in: step 1 = show the Approve prompt (nothing is signed yet) ----
+    let pendingUsername = null;
+
+    $("login-button").addEventListener("click", async () => {
+      const username = $("login-username").value.trim();
+      if (!username) return showMessage($("login-message"), "Please type your username.", false);
+
+      try {
+        if (!(await ZP.loadKey(username))) {
+          return showMessage($("login-message"),
+            "No key for that username on this device. Register first.", false);
+        }
+      } catch (error) {
+        return showMessage($("login-message"), "Something went wrong: " + error.message, false);
+      }
+
+      pendingUsername = username;
+      $("approve-site").textContent = window.location.origin;   // the browser's REAL address
+      $("approve-user").textContent = username;
+      $("login-message").textContent = "";
+      showView("approve");
+    });
+
+    // ---- Log in: step 2 = user approves -> sign and send ----
+    $("approve-button").addEventListener("click", async () => {
+      $("approve-button").disabled = true;
+      try {
+        const result = await ZP.login(pendingUsername);
+        if (result.ok) {
+          enterDashboard(result.username);
+        } else {
+          showView("auth");
+          showMessage($("login-message"), errorText(result), false);
+        }
+      } catch (error) {
+        showView("auth");
+        showMessage($("login-message"), "Something went wrong: " + error.message, false);
+      }
+      $("approve-button").disabled = false;
+    });
+
+    $("cancel-button").addEventListener("click", () => {
+      pendingUsername = null;
+      showView("auth");
+    });
+
+    // ---- Log out ----
+    $("logout-button").addEventListener("click", () => {
+      ZP.logout();
+      $("login-message").textContent = "";
+      showView("auth");
+    });
+
+    // ---- If we already have a valid session (page refreshed), go straight to the dashboard ----
+    ZP.currentUser().then((username) => { if (username) enterDashboard(username); }).catch(() => {});
+  </script>
+</body>
+</html>

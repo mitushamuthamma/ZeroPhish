@@ -14,11 +14,12 @@ const ZP = (() => {
   }
 
   // Make a fresh ECDSA P-256 key pair.
-  // The 'false' means the PRIVATE key is NON-EXTRACTABLE: even our own code can never read it out.
-  async function generateKeyPair() {
+  // Normal mode (extractable = false): the PRIVATE key is NON-EXTRACTABLE, so even our own
+  // code can never read it out. Demo mode (extractable = true) exists ONLY for the phishing demo.
+  async function generateKeyPair(extractable = false) {
     return crypto.subtle.generateKey(
       { name: "ECDSA", namedCurve: "P-256" },
-      false,
+      extractable,
       ["sign", "verify"]
     );
   }
@@ -60,8 +61,8 @@ const ZP = (() => {
   // Full registration: make keys -> send PUBLIC key to server -> keep PRIVATE key here.
   // We only save the private key AFTER the server accepts, so a "username taken"
   // answer can never overwrite a working key.
-  async function register(username) {
-    const { publicKey, privateKey } = await generateKeyPair();
+  async function register(username, demoMode = false) {
+    const { publicKey, privateKey } = await generateKeyPair(demoMode);
     const response = await fetch("/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -129,9 +130,42 @@ const ZP = (() => {
     sessionStorage.removeItem("zp_username");
   }
 
+  // ---- DEMO ONLY: move a key to another website address ----
+  // Real passkeys live in a phone or security key that signs for WHATEVER address the browser
+  // reports. These two functions imitate that "key that follows the user", so we can show a
+  // signature being made on the fake site and then rejected by the real server.
+  async function exportDemoKey(username) {
+    const privateKey = await loadKey(username);
+    if (!privateKey) throw new Error("No key for that username on this device.");
+    if (!privateKey.extractable) {
+      throw new Error("This key is non-extractable (normal, secure mode). " +
+        "For the demo, register a NEW account with 'Demo mode' ticked.");
+    }
+    const jwk = await crypto.subtle.exportKey("jwk", privateKey);
+    return JSON.stringify({ username, jwk }, null, 2);
+  }
+
+  async function importDemoKey(text) {
+    let data;
+    try { data = JSON.parse(text); } catch (e) { data = null; }
+    if (!data || !data.username || !data.jwk || !data.jwk.d) {
+      throw new Error("That file is not a ZeroPhish demo key.");
+    }
+    let privateKey;
+    try {
+      privateKey = await crypto.subtle.importKey(
+        "jwk", data.jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+    } catch (e) {
+      throw new Error("That key file is damaged or not a P-256 key.");
+    }
+    await saveKey(data.username, privateKey);   // saved for THIS website address only
+    return data.username;
+  }
+
   return {
     toBase64, generateKeyPair, exportPublicKey, saveKey, loadKey,
     register, signMessage, login, currentUser, logout,
+    exportDemoKey, importDemoKey,
   };
 })();
 

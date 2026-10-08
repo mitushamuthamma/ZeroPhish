@@ -16,6 +16,10 @@
     button.secondary { background: #e5e7eb; color: #111; }
     button:disabled { opacity: .6; cursor: wait; }
     hr { margin: 28px 0; border: 0; border-top: 1px solid #ddd; }
+    label.check { display: block; font-size: 13px; color: #555; margin-top: 10px; }
+    label.check input { width: auto; margin: 0 8px 0 0; }
+    details { margin-top: 6px; }
+    summary { cursor: pointer; font-weight: 600; }
     .message { min-height: 1.4em; margin-top: 14px; font-size: 14px; }
     .ok { color: #0a7a2f; }
     .error { color: #b42318; }
@@ -34,6 +38,8 @@
       <h2>Create account</h2>
       <p class="hint">No password. Your browser makes a secret key that never leaves this device.</p>
       <input id="reg-username" placeholder="Choose a username" autocomplete="off">
+      <label class="check"><input type="checkbox" id="reg-demo">
+        Demo mode: make this key exportable (for the phishing demo only)</label>
       <button id="reg-button">Create account</button>
       <p id="reg-message" class="message"></p>
 
@@ -44,6 +50,20 @@
       <input id="login-username" placeholder="Your username" autocomplete="off">
       <button id="login-button">Log in</button>
       <p id="login-message" class="message"></p>
+
+      <hr>
+
+      <details>
+        <summary>Demo tools (for the phishing demo)</summary>
+        <p class="hint">Real passkeys live in a phone or security key that signs for whatever website
+          address the browser reports. These tools imitate that. Export a key from the real site,
+          then import it on the fake one. Only works for accounts made with "Demo mode" ticked.</p>
+        <input id="demo-username" placeholder="Username to export" autocomplete="off">
+        <button id="export-button" class="secondary">Export demo key</button>
+        <p class="hint" style="margin-bottom:0">Import a key file on this site:</p>
+        <input id="import-file" type="file" accept=".json">
+        <p id="demo-message" class="message"></p>
+      </details>
     </section>
 
     <!-- VIEW 2: the "Approve login" prompt -->
@@ -104,7 +124,7 @@
 
       $("reg-button").disabled = true;
       try {
-        const result = await ZP.register(username);
+        const result = await ZP.register(username, $("reg-demo").checked);
         showMessage($("reg-message"), result.ok ? result.message : errorText(result), result.ok);
       } catch (error) {
         showMessage($("reg-message"), "Something went wrong: " + error.message, false);
@@ -156,6 +176,46 @@
     $("cancel-button").addEventListener("click", () => {
       pendingUsername = null;
       showView("auth");
+    });
+
+    // ---- Demo tools: export a key file / import a key file ----
+    function readFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsText(file);
+      });
+    }
+
+    $("export-button").addEventListener("click", async () => {
+      const username = $("demo-username").value.trim();
+      if (!username) return showMessage($("demo-message"), "Type the username to export.", false);
+      try {
+        const text = await ZP.exportDemoKey(username);
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+        link.download = "zerophish-demo-key-" + username + ".json";
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        showMessage($("demo-message"), "Key file downloaded. Import it on the other site. (Demo only!)", true);
+      } catch (error) {
+        showMessage($("demo-message"), error.message, false);
+      }
+    });
+
+    $("import-file").addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        const username = await ZP.importDemoKey(await readFile(file));
+        showMessage($("demo-message"),
+          "Imported the key for '" + username + "' on " + window.location.origin +
+          ". You can now log in as that user here.", true);
+      } catch (error) {
+        showMessage($("demo-message"), error.message, false);
+      }
+      event.target.value = "";
     });
 
     // ---- Log out ----

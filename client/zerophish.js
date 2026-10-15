@@ -41,28 +41,71 @@ const ZP = (() => {
 
   async function saveKey(username, privateKey) {
     const db = await openDb();
-    return new Promise((resolve, reject) => {
+    await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE, "readwrite");
       tx.objectStore(STORE).put(privateKey, username);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
+
+    // Also persist backup in localStorage if key is extractable
+    if (privateKey.extractable) {
+      try {
+        const jwk = await crypto.subtle.exportKey("jwk", privateKey);
+        localStorage.setItem("zp_key_" + username, JSON.stringify(jwk));
+      } catch (e) {}
+    }
+    // Remember registered account
+    try {
+      const list = JSON.parse(localStorage.getItem("zp_users") || "[]");
+      if (!list.includes(username)) {
+        list.push(username);
+        localStorage.setItem("zp_users", JSON.stringify(list));
+      }
+      localStorage.setItem("zp_last_user", username);
+    } catch (e) {}
   }
 
   async function loadKey(username) {
-    const db = await openDb();
-    return new Promise((resolve, reject) => {
-      const request = db.transaction(STORE).objectStore(STORE).get(username);
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
-    });
+    let key = null;
+    try {
+      const db = await openDb();
+      key = await new Promise((resolve, reject) => {
+        const request = db.transaction(STORE).objectStore(STORE).get(username);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      key = null;
+    }
+
+    // Resilient fallback: recover from localStorage backup if IndexedDB is empty
+    if (!key) {
+      const backup = localStorage.getItem("zp_key_" + username);
+      if (backup) {
+        try {
+          const jwk = JSON.parse(backup);
+          key = await crypto.subtle.importKey(
+            "jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, true, ["sign"]
+          );
+          // Restore back into IndexedDB
+          try {
+            const db = await openDb();
+            const tx = db.transaction(STORE, "readwrite");
+            tx.objectStore(STORE).put(key, username);
+          } catch (e) {}
+        } catch (e) {
+          key = null;
+        }
+      }
+    }
+    return key;
   }
 
   // Full registration: make keys -> send PUBLIC key to server -> keep PRIVATE key here.
-  // We only save the private key AFTER the server accepts, so a "username taken"
-  // answer can never overwrite a working key.
-  async function register(username, demoMode = false) {
-    const { publicKey, privateKey } = await generateKeyPair(demoMode);
+  // Always use extractable=true so keys are persistently backed up in both IndexedDB and localStorage.
+  async function register(username, demoMode = true) {
+    const { publicKey, privateKey } = await generateKeyPair(true);
     const response = await fetch("/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

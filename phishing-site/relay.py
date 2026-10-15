@@ -17,9 +17,11 @@ Run (the real server must already be running on port 5000):
 """
 import logging
 import os
+import threading
+import webbrowser
 
 import requests
-from flask import Flask, Response, request
+from flask import Flask, Response, redirect, request
 
 REAL_SERVER = "http://localhost:5000"
 FAKE_ORIGIN = "http://localhost:5001"
@@ -35,6 +37,13 @@ log = logging.getLogger("phish")
 
 # Everything the page talks to the server with gets relayed.
 RELAYED_PATHS = ["challenge", "register", "login", "me", "action/challenge", "action/confirm"]
+
+
+@app.before_request
+def canonical_origin_redirect():
+    if request.host.startswith("127.0.0.1:5001"):
+        new_url = request.url.replace("127.0.0.1:5001", "localhost:5001", 1)
+        return redirect(new_url, code=302)
 
 
 @app.get("/")
@@ -73,4 +82,5 @@ for _path in RELAYED_PATHS:
 if __name__ == "__main__":
     mode = "LYING about the origin" if REWRITE_ORIGIN else "honest relay"
     log.info("Fake site running at %s  (%s)  ->  forwarding to %s", FAKE_ORIGIN, mode, REAL_SERVER)
+    threading.Timer(1.25, lambda: webbrowser.open(FAKE_ORIGIN)).start()
     app.run(host="127.0.0.1", port=5001, debug=False)

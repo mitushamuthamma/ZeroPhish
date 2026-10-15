@@ -16,13 +16,15 @@ import os
 import re
 import secrets
 import sqlite3
+import threading
 import time
+import webbrowser
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
-from flask import Flask, g, jsonify, request
+from flask import Flask, g, jsonify, redirect, request
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -200,6 +202,15 @@ def public_key_of(username):
 
 
 # ------------------------------------------------------------------ routes
+@app.before_request
+def canonical_origin_redirect():
+    # If the user accessed via 127.0.0.1:5000, seamlessly redirect to localhost:5000
+    # so browser keys and server origin verification are 100% consistent across sessions
+    if request.host.startswith("127.0.0.1:5000"):
+        new_url = request.url.replace("127.0.0.1:5000", "localhost:5000", 1)
+        return redirect(new_url, code=302)
+
+
 @app.get("/")
 def index():
     return app.send_static_file("index.html")
@@ -335,4 +346,7 @@ def action_confirm():
 
 if __name__ == "__main__":
     init_db()
+    # Automatically open the site in the default browser on startup
+    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        threading.Timer(1.25, lambda: webbrowser.open("http://localhost:5000")).start()
     app.run(host="127.0.0.1", port=5000, debug=True)

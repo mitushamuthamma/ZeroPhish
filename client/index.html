@@ -14,6 +14,7 @@
     input, button { width: 100%; box-sizing: border-box; padding: 10px; font-size: 16px; margin-top: 10px; }
     button { background: #1a56db; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
     button.secondary { background: #e5e7eb; color: #111; }
+    button.danger { background: #b42318; color: #fff; }
     button:disabled { opacity: .6; cursor: wait; }
     hr { margin: 28px 0; border: 0; border-top: 1px solid #ddd; }
     label.check { display: block; font-size: 13px; color: #555; margin-top: 10px; }
@@ -26,7 +27,20 @@
     .site-box { background: #eef4ff; border: 1px solid #b6ccf5; border-radius: 8px; padding: 14px; margin: 14px 0; }
     .site-box .label { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: .04em; }
     .site-box .value { font-size: 18px; font-weight: 600; word-break: break-all; margin-bottom: 8px; }
+    .site-box .value.small { font-size: 15px; }
     .welcome { font-size: 20px; font-weight: 600; }
+    /* Sensitive-action panel */
+    .action-panel { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-top: 20px; }
+    .action-panel h3 { margin: 0 0 8px; font-size: 16px; }
+    .action-panel .hint { margin: 0 0 6px; }
+    .action-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .action-tabs button { margin-top: 0; flex: 1; font-size: 14px; padding: 8px; }
+    .action-tabs button.active { background: #1a56db; color: #fff; }
+    .action-tabs button:not(.active) { background: #e5e7eb; color: #111; }
+    .action-form { display: none; }
+    .action-form.active { display: block; }
+    .ttl-bar { height: 4px; background: #e5e7eb; border-radius: 2px; margin-top: 10px; overflow: hidden; }
+    .ttl-fill { height: 100%; background: #1a56db; transition: width 1s linear; }
   </style>
 </head>
 <body>
@@ -86,10 +100,53 @@
       <p class="welcome">&#9989; Logged in as <span id="dash-user"></span></p>
       <p class="hint">No password was used. The server checked your signature against your public key.</p>
 
-      <!-- Delicia (Person 4): the sensitive-action form (change email / transfer funds) goes here -->
-      <div id="actions-area"></div>
+      <!-- Objective 3: Sensitive-action panel -->
+      <div class="action-panel">
+        <h3>&#128274; Sensitive Actions</h3>
+        <p class="hint">Each action requires a fresh one-time signature (30-second window).</p>
+        <div class="action-tabs">
+          <button id="tab-email" class="active" onclick="switchTab('email')">Change Email</button>
+          <button id="tab-funds" onclick="switchTab('funds')">Transfer Funds</button>
+        </div>
 
-      <button id="logout-button" class="secondary">Log out</button>
+        <!-- Change Email form -->
+        <div id="form-email" class="action-form active">
+          <input id="email-new" placeholder="New email address" type="email" autocomplete="off">
+          <button id="email-action-button">Sign &amp; Change Email</button>
+          <p id="email-action-message" class="message"></p>
+        </div>
+
+        <!-- Transfer Funds form -->
+        <div id="form-funds" class="action-form">
+          <input id="funds-recipient" placeholder="Recipient username" autocomplete="off">
+          <input id="funds-amount" placeholder="Amount (e.g. 50.00)" type="number" min="0.01" step="0.01">
+          <button id="funds-action-button" class="danger">Sign &amp; Transfer Funds</button>
+          <p id="funds-action-message" class="message"></p>
+        </div>
+      </div>
+
+      <button id="logout-button" class="secondary" style="margin-top:20px">Log out</button>
+    </section>
+
+    <!-- VIEW 4: Approve sensitive action -->
+    <section id="action-approve-view" hidden>
+      <h2>Approve this action?</h2>
+      <p class="hint">Your browser will sign a fresh one-time challenge for exactly this website and action.
+         If anything looks wrong, press Cancel.</p>
+      <div class="site-box">
+        <div class="label">Website</div>
+        <div class="value" id="action-approve-site"></div>
+        <div class="label">Account</div>
+        <div class="value" id="action-approve-user"></div>
+        <div class="label">Action</div>
+        <div class="value small" id="action-approve-action"></div>
+        <div class="label">Details</div>
+        <div class="value small" id="action-approve-details"></div>
+      </div>
+      <div class="ttl-bar"><div class="ttl-fill" id="action-ttl-fill" style="width:100%"></div></div>
+      <p class="hint" style="text-align:center;margin-top:4px">Challenge expires in <span id="action-ttl-secs">30</span>s</p>
+      <button id="action-approve-button">Approve &amp; Sign</button>
+      <button id="action-cancel-button" class="secondary">Cancel</button>
     </section>
   </main>
 
@@ -227,6 +284,151 @@
 
     // ---- If we already have a valid session (page refreshed), go straight to the dashboard ----
     ZP.currentUser().then((username) => { if (username) enterDashboard(username); }).catch(() => {});
+
+    // ================================================================
+    // OBJECTIVE 3: Sensitive-action screen
+    // ================================================================
+
+    // Add action-approve-view to the views map so showView() works.
+    views["action-approve"] = $("action-approve-view");
+
+    // Which tab is showing ("email" or "funds").
+    function switchTab(name) {
+      $("tab-email").classList.toggle("active", name === "email");
+      $("tab-funds").classList.toggle("active", name === "funds");
+      $("form-email").classList.toggle("active", name === "email");
+      $("form-funds").classList.toggle("active", name === "funds");
+    }
+
+    // TTL countdown state.
+    let ttlTimer = null;
+
+    function startTtlCountdown(seconds) {
+      clearInterval(ttlTimer);
+      let remaining = seconds;
+      const fill = $("action-ttl-fill");
+      const secs = $("action-ttl-secs");
+      secs.textContent = remaining;
+      fill.style.width = "100%";
+      ttlTimer = setInterval(() => {
+        remaining--;
+        secs.textContent = Math.max(remaining, 0);
+        fill.style.width = Math.max((remaining / seconds) * 100, 0) + "%";
+        if (remaining <= 0) clearInterval(ttlTimer);
+      }, 1000);
+    }
+
+    // Pending action state (set before showing the approve view).
+    let pendingAction = null; // { action, details, nonce, msgForSig }
+    let afterActionView = "dashboard"; // which view to go back to on cancel
+
+    // Helper: get the auth token.
+    function authHeader() {
+      return { Authorization: "Bearer " + (sessionStorage.getItem("zp_token") || "") };
+    }
+
+    // Step 1: ask server for a fresh action challenge, then show the approve screen.
+    async function startAction(action, details, msgElement, buttonElement) {
+      buttonElement.disabled = true;
+      showMessage(msgElement, "Requesting challenge…", true);
+      try {
+        const resp = await fetch("/action/challenge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ action }),
+          cache: "no-store",
+        });
+        const data = await resp.json();
+        if (!data.ok) {
+          showMessage(msgElement, errorText(data), false);
+          buttonElement.disabled = false;
+          return;
+        }
+
+        // Build the message that will be signed (MUST match server's formula).
+        const origin = window.location.origin;
+        const msgForSig = `${data.nonce}|${origin}|${action}|${details}`;
+
+        pendingAction = { action, details, nonce: data.nonce, msgForSig };
+        msgElement.textContent = "";
+
+        // Fill the approve view.
+        $("action-approve-site").textContent = origin;
+        $("action-approve-user").textContent = sessionStorage.getItem("zp_username") || "";
+        $("action-approve-action").textContent = action.replace("_", " ");
+        $("action-approve-details").textContent = details || "(none)";
+        startTtlCountdown(data.expires_in);
+        showView("action-approve");
+      } catch (err) {
+        showMessage(msgElement, "Something went wrong: " + err.message, false);
+      }
+      buttonElement.disabled = false;
+    }
+
+    // Step 2: user clicks "Approve & Sign" → sign and POST /action/confirm.
+    $("action-approve-button").addEventListener("click", async () => {
+      if (!pendingAction) return;
+      $("action-approve-button").disabled = true;
+      clearInterval(ttlTimer);
+
+      const username = sessionStorage.getItem("zp_username");
+      try {
+        const privateKey = await ZP.loadKey(username);
+        if (!privateKey) throw new Error("No key found for " + username + ". Are you logged in?");
+
+        const signature = await ZP.signMessage(privateKey, pendingAction.msgForSig);
+        const origin = window.location.origin;
+
+        const resp = await fetch("/action/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({
+            nonce: pendingAction.nonce,
+            signature,
+            origin,
+            action: pendingAction.action,
+            details: pendingAction.details,
+          }),
+        });
+        const result = await resp.json();
+
+        showView("dashboard");
+        // Show the result in the correct tab's message area.
+        const msgId = pendingAction.action === "change_email" ? "email-action-message" : "funds-action-message";
+        showMessage($(msgId), result.ok ? "✅ " + result.message : "❌ " + errorText(result), result.ok);
+        pendingAction = null;
+      } catch (err) {
+        showView("dashboard");
+        const msgId = pendingAction?.action === "change_email" ? "email-action-message" : "funds-action-message";
+        showMessage($(msgId), "Something went wrong: " + err.message, false);
+        pendingAction = null;
+      }
+      $("action-approve-button").disabled = false;
+    });
+
+    $("action-cancel-button").addEventListener("click", () => {
+      clearInterval(ttlTimer);
+      pendingAction = null;
+      showView("dashboard");
+    });
+
+    // ---- Change Email button ----
+    $("email-action-button").addEventListener("click", async () => {
+      const newEmail = $("email-new").value.trim();
+      if (!newEmail) return showMessage($("email-action-message"), "Please enter a new email address.", false);
+      if (!newEmail.includes("@")) return showMessage($("email-action-message"), "That doesn't look like an email address.", false);
+      await startAction("change_email", newEmail, $("email-action-message"), $("email-action-button"));
+    });
+
+    // ---- Transfer Funds button ----
+    $("funds-action-button").addEventListener("click", async () => {
+      const recipient = $("funds-recipient").value.trim();
+      const amount = parseFloat($("funds-amount").value);
+      if (!recipient) return showMessage($("funds-action-message"), "Please enter a recipient.", false);
+      if (!amount || amount <= 0) return showMessage($("funds-action-message"), "Please enter a valid amount.", false);
+      const details = `to:${recipient};amount:${amount.toFixed(2)}`;
+      await startAction("transfer_funds", details, $("funds-action-message"), $("funds-action-button"));
+    });
   </script>
 </body>
 </html>

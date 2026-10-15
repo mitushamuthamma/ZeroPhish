@@ -36,7 +36,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s", datef
 log = logging.getLogger("phish")
 
 # Everything the page talks to the server with gets relayed.
-RELAYED_PATHS = ["challenge", "register", "login", "me", "action/challenge", "action/confirm"]
+RELAYED_PATHS = [
+    "challenge", "register", "register/verify", "login", "me",
+    "action/challenge", "action/confirm", "action/history", "security/status"
+]
 
 
 @app.before_request

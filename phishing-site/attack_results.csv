@@ -13,5 +13,3 @@
 12,Change the details after signing,"Victim signed 'new@mail.com', thief swaps in 'evil@mail.com'",invalid_signature,invalid_signature,BLOCKED
 13,Use a LOGIN challenge to approve an action,Tries to turn a login signature into a transfer approval,wrong_purpose,wrong_purpose,BLOCKED
 14,Phishing site tricks victim into approving a transfer,Fake site relays the 'approve transfer' request,wrong_domain,wrong_domain,BLOCKED
-15,Use an expired login challenge,"Waits over 60 seconds, then sends a valid signature",challenge_expired,challenge_expired,BLOCKED
-16,Use an expired action challenge,"Waits over 30 seconds, then sends a valid signature",challenge_expired,challenge_expired,BLOCKED

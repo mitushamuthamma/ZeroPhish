@@ -1230,24 +1230,53 @@
             <div id="login-message" class="status-msg"></div>
           </div>
 
-          <!-- Register Form -->
+          <!-- Register Form (Point 6: Secondary Verification Supported) -->
           <div id="register-form-box" style="display:none;">
-            <div class="field-group">
-              <div class="field-label">
-                <span>New Username</span>
-                <button type="button" class="btn-demo-quick" onclick="quickFill('judge_demo')">Fill: judge_demo</button>
+            <div id="reg-inputs-step">
+              <div class="field-group">
+                <div class="field-label">
+                  <span>New Username</span>
+                  <button type="button" class="btn-demo-quick" onclick="quickFill('judge_demo')">Fill: judge_demo</button>
+                </div>
+                <input id="reg-username" type="text" placeholder="Choose a username" autocomplete="off">
               </div>
-              <input id="reg-username" type="text" placeholder="Choose a username" autocomplete="off">
+              <div class="field-group" style="margin-top:12px;">
+                <div class="field-label">
+                  <span>Secondary Email Check <span style="color:var(--cyan);font-size:11px;">(Slide Point 6)</span></span>
+                  <button type="button" class="btn-demo-quick" onclick="$('reg-email').value='demo@example.com'">Fill: demo@example.com</button>
+                </div>
+                <input id="reg-email" type="email" placeholder="Optional email for secondary check" autocomplete="off">
+              </div>
+              <button id="reg-button" class="btn btn-primary" style="margin-top:8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <line x1="19" y1="8" x2="19" y2="14" />
+                  <line x1="22" y1="11" x2="16" y2="11" />
+                </svg>
+                Create Account
+              </button>
             </div>
-            <button id="reg-button" class="btn btn-primary">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <line x1="19" y1="8" x2="19" y2="14" />
-                <line x1="22" y1="11" x2="16" y2="11" />
-              </svg>
-              Create Account
-            </button>
+
+            <!-- Point 6: Secondary Email OTP Verification Step -->
+            <div id="reg-otp-step" style="display:none;background:var(--surface-inset);padding:14px;border-radius:var(--radius-sm);border:1px solid rgba(6,182,212,0.3);margin-top:12px;">
+              <div style="font-size:13px;font-weight:600;color:#67e8f9;display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                Secondary Verification Required
+              </div>
+              <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px;">
+                Enter the 6-digit confirmation code issued to <strong id="reg-otp-email" style="color:#fff;">...</strong>:
+              </p>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input id="reg-otp-code" type="text" placeholder="6-digit code" maxlength="6" style="font-family:var(--font-mono);font-size:15px;letter-spacing:2px;text-align:center;">
+                <button type="button" id="btn-otp-autofill" class="btn-demo-quick" style="white-space:nowrap;">Auto-fill</button>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:10px;">
+                <button id="btn-verify-otp" class="btn btn-primary" style="padding:8px 12px;font-size:13px;">Confirm &amp; Register</button>
+                <button type="button" class="btn btn-secondary" style="width:auto;padding:8px 10px;font-size:12px;" onclick="cancelOtpStep()">Cancel</button>
+              </div>
+            </div>
+
             <div id="reg-message" class="status-msg"></div>
           </div>
 
@@ -1294,6 +1323,14 @@
               </svg>
               Origin Guarded
             </span>
+            <span class="sec-tag" id="dash-key-bound-tag"
+              style="background:rgba(124, 58, 237, 0.12);border-color:rgba(124, 58, 237, 0.35);color:#c4b5fd;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              Key-Bound Session (Point 3)
+            </span>
           </div>
 
           <!-- Sensitive Actions -->
@@ -1338,6 +1375,23 @@
             <div id="activity-feed" style="display:grid;gap:6px;max-height:130px;overflow-y:auto;font-size:12.5px;">
             </div>
           </div>
+
+          <!-- Point 7: Encrypted At-Rest Storage Inspection Ledger -->
+          <details class="drawer" style="margin-top:16px;">
+            <summary style="display:flex;align-items:center;justify-content:space-between;">
+              <span>Database At-Rest Encryption (AES-256-GCM)</span>
+              <span class="badge-pill allowed" style="font-size:10.5px;">Point 7 Verified</span>
+            </summary>
+            <p style="font-size:12px;color:var(--text-muted);margin:8px 0;">
+              Even if <code>zerophish.db</code> is stolen in a breach, sensitive parameters (emails, wire details) are stored as AES-256-GCM ciphertext:
+            </p>
+            <div id="encrypted-storage-preview" style="font-family:var(--font-mono);font-size:11.5px;display:grid;gap:6px;max-height:140px;overflow-y:auto;background:var(--surface-inset);padding:10px;border-radius:var(--radius-sm);color:#94a3b8;">
+              <span style="color:#64748b;">Loading encrypted records...</span>
+            </div>
+            <button type="button" class="btn btn-secondary" style="width:100%;margin-top:8px;padding:6px;font-size:11.5px;" onclick="loadEncryptedStorageAudit()">
+              Refresh Encrypted Storage Audit
+            </button>
+          </details>
 
           <button id="logout-button" class="btn btn-secondary" style="margin-top:18px;">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1468,6 +1522,49 @@
               style="color:var(--red)">wrong_domain</code>).
           </p>
         </div>
+
+        <!-- Point 5: Autonomous Anomaly Detection & Threat Monitor -->
+        <div class="glass-card" style="margin-top:20px;">
+          <div class="card-header" style="margin-bottom:12px;">
+            <h2 class="card-title" style="font-size:18px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              Autonomous Anomaly Detection (Point 5)
+            </h2>
+            <div id="anomaly-badge-status">
+              <span class="badge-pill allowed" style="font-size:12px;">0 Active Blocks • Normal</span>
+            </div>
+          </div>
+          <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;">
+            Continuously monitors verification failures, phishing relay traps, replay attempts, and rapid registration floods. Suspicious entities exceeding anomaly thresholds are automatically quarantined.
+          </p>
+          <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;margin-bottom:14px;">
+            <div style="background:var(--surface-inset);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);">
+              <div style="font-size:11px;color:var(--text-muted);">24h Security Events</div>
+              <div id="anomaly-stat-total" style="font-size:20px;font-weight:700;color:#fff;">0</div>
+            </div>
+            <div style="background:var(--surface-inset);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);">
+              <div style="font-size:11px;color:var(--text-muted);">High / Critical Alerts</div>
+              <div id="anomaly-stat-high" style="font-size:20px;font-weight:700;color:var(--red);">0</div>
+            </div>
+            <div style="background:var(--surface-inset);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);">
+              <div style="font-size:11px;color:var(--text-muted);">Quarantined Entities</div>
+              <div id="anomaly-stat-blocked" style="font-size:20px;font-weight:700;color:var(--amber);">0</div>
+            </div>
+          </div>
+          <div class="terminal-box">
+            <div class="terminal-bar">
+              <span>SECURITY &amp; ANOMALY AUDIT TRAIL</span>
+              <span style="cursor:pointer;opacity:0.7" onclick="fetchSecurityStatus()">Refresh</span>
+            </div>
+            <div class="wire-stream" id="anomaly-event-stream" style="max-height:160px;font-size:11.5px;">
+              <div style="color:#64748b;text-align:center;padding:8px 0;">Loading anomaly audit log...</div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1565,6 +1662,88 @@
           </div>
         </div>
 
+        </div>
+
+        <!-- 03 — Beyond Login (Slide Match) -->
+        <div class="glass-card" style="margin-top:24px;border-color:rgba(124, 58, 237, 0.4);background:linear-gradient(180deg, rgba(16, 19, 35, 0.95), rgba(10, 12, 24, 0.9));">
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--cyan);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">03 — Beyond Login</div>
+          <h2 style="font-family:var(--font-display);font-size:24px;margin:0 0 10px;color:#fff;">A stolen session cookie is not enough</h2>
+          <p style="font-size:14px;color:var(--text-muted);line-height:1.6;margin:0 0 20px;">
+            Once you're logged in, most systems just hand out a session cookie that can be stolen and reused without ever needing the private key again. ZeroPhish extends domain-bound signing across the whole system, not just the login step.
+          </p>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;">
+            <div style="background:var(--surface-inset);padding:14px;border-radius:var(--radius-sm);border-left:3px solid var(--cyan);">
+              <div style="display:flex;align-items:center;gap:8px;font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">
+                <span class="step-num" style="width:20px;height:20px;font-size:11px;margin:0;">1</span>
+                Sign sensitive actions
+              </div>
+              <p style="font-size:12.5px;color:var(--text-muted);margin:0;">Changing a password, editing email, or transferring funds require a fresh signature at the moment of the action — not just a valid cookie.</p>
+            </div>
+
+            <div style="background:var(--surface-inset);padding:14px;border-radius:var(--radius-sm);border-left:3px solid var(--cyan);">
+              <div style="display:flex;align-items:center;gap:8px;font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">
+                <span class="step-num" style="width:20px;height:20px;font-size:11px;margin:0;">2</span>
+                Time-limited, one-use signatures
+              </div>
+              <p style="font-size:12.5px;color:var(--text-muted);margin:0;">Every signature expires quickly (30s) and burns immediately upon first check, closing the door completely on replay attacks.</p>
+            </div>
+
+            <div style="background:var(--surface-inset);padding:14px;border-radius:var(--radius-sm);border-left:3px solid var(--cyan);">
+              <div style="display:flex;align-items:center;gap:8px;font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">
+                <span class="step-num" style="width:20px;height:20px;font-size:11px;margin:0;">3</span>
+                Bind sessions to the key
+              </div>
+              <p style="font-size:12.5px;color:var(--text-muted);margin:0;">Sessions in the database are tied to the verified public key itself, so a stolen cookie alone isn't enough to act as the user.</p>
+            </div>
+
+            <div style="background:var(--surface-inset);padding:14px;border-radius:var(--radius-sm);border-left:3px solid var(--cyan);">
+              <div style="display:flex;align-items:center;gap:8px;font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">
+                <span class="step-num" style="width:20px;height:20px;font-size:11px;margin:0;">4</span>
+                Scoped permissions
+              </div>
+              <p style="font-size:12.5px;color:var(--text-muted);margin:0;">A signature made for changing an email can't be reused to perform a wire transfer or administrative action (nonce purpose-bound).</p>
+            </div>
+
+            <div style="background:var(--surface-inset);padding:14px;border-radius:var(--radius-sm);border-left:3px solid var(--cyan);">
+              <div style="display:flex;align-items:center;gap:8px;font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">
+                <span class="step-num" style="width:20px;height:20px;font-size:11px;margin:0;">5</span>
+                Anomaly detection
+              </div>
+              <p style="font-size:12.5px;color:var(--text-muted);margin:0;">Repeated failed verifications, fake relay traps, or rapid registration floods are flagged and automatically placed into quarantine lockout.</p>
+            </div>
+
+            <div style="background:var(--surface-inset);padding:14px;border-radius:var(--radius-sm);border-left:3px solid var(--cyan);">
+              <div style="display:flex;align-items:center;gap:8px;font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">
+                <span class="step-num" style="width:20px;height:20px;font-size:11px;margin:0;">6</span>
+                Secure the registration step
+              </div>
+              <p style="font-size:12.5px;color:var(--text-muted);margin:0;">Domain-binding can't protect the very first signup, so a secondary confirmation check (6-digit email confirmation code) is enforced there.</p>
+            </div>
+
+            <div style="background:var(--surface-inset);padding:14px;border-radius:var(--radius-sm);border-left:3px solid var(--cyan);grid-column: 1 / -1;">
+              <div style="display:flex;align-items:center;gap:8px;font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">
+                <span class="step-num" style="width:20px;height:20px;font-size:11px;margin:0;">7</span>
+                Encrypt stored data
+              </div>
+              <p style="font-size:12.5px;color:var(--text-muted);margin:0;">Sensitive actions (transfer amounts, recipient addresses) are encrypted with AES-256-GCM. Even if the server database leaks, sensitive data doesn't leak in plain text.</p>
+            </div>
+          </div>
+
+          <!-- Net Effect Callout -->
+          <div style="margin-top:20px;background:rgba(16, 185, 129, 0.1);border:1px solid rgba(16, 185, 129, 0.35);padding:16px;border-radius:var(--radius-sm);display:flex;align-items:flex-start;gap:12px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" style="flex-shrink:0;margin-top:2px;">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <div>
+              <div style="font-weight:700;color:#6ee7b7;font-size:15px;margin-bottom:2px;">Net effect</div>
+              <div style="font-size:13.5px;color:var(--text-muted);">
+                A stolen cookie alone is now powerless — sensitive actions still demand fresh proof from the device's private key.
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="glass-card" style="margin-top:24px;">
           <h3 style="margin:0 0 12px;font-size:17px;font-family:var(--font-display);">Cryptographic Formulas</h3>
           <div
@@ -1573,6 +1752,7 @@
             <div><strong>Authentication:</strong> Signature = Sign(Client_PrivateKey, Nonce + "|" + Origin)</div>
             <div><strong>Sensitive Action:</strong> Signature = Sign(Client_PrivateKey, Nonce + "|" + Origin + "|" +
               Action + "|" + Details)</div>
+            <div><strong>Database At-Rest:</strong> Ciphertext = AES_256_GCM_Encrypt(ServerKey, Nonce_12B, Action_Details)</div>
           </div>
         </div>
       </div>
@@ -1867,6 +2047,7 @@
       $("dash-avatar").textContent = username.charAt(0).toUpperCase();
       showPanel("dashboard");
       addActivity(`Logged in as ${username}`, true);
+      loadEncryptedStorageAudit();
     }
 
     // Direct, frictionless 1-click Login
@@ -1903,10 +2084,12 @@
           renderSavedAccounts();
         } else {
           setPipelineStep(3, "failure");
-          const isBlocked = result.error === "wrong_domain" || result.error === "invalid_signature";
+          const isBlocked = result.error === "wrong_domain" || result.error === "invalid_signature" || result.error === "anomaly_blocked";
           let failText = result.message;
-          if (isBlocked) {
+          if (result.error === "wrong_domain") {
             failText = `🚨 Phishing Blocked: Login rejected because this origin (${window.location.origin}) is not the authentic server.`;
+          } else if (result.error === "anomaly_blocked") {
+            failText = `🛡️ Anomaly Quarantine: ${result.message}`;
           } else if (result.error) {
             failText = `${result.message} [${result.error}]`;
           }
@@ -1920,9 +2103,10 @@
       loginBtn.innerHTML = originalHtml;
     }
 
-    // Registration Handler
+    // Registration Handler (Point 6: Secondary Verification Check Supported)
     async function performRegister() {
       const username = $("reg-username").value.trim();
+      const email = $("reg-email") ? $("reg-email").value.trim() : null;
       const msg = $("reg-message");
       if (!username) return showMessage(msg, "Please specify a username.", false);
 
@@ -1938,16 +2122,28 @@
       setPipelineStep(1, "active");
 
       try {
-        const result = await ZP.register(username, true);
+        const result = await ZP.register(username, email, true);
         if (result.ok) {
-          setPipelineStep(3, "success");
-          showMessage(msg, "Account created! You can now log in.", true);
-          quickFill(username);
-          renderSavedAccounts();
-          setTimeout(() => {
-            setAuthMode("login");
-            showMessage($("login-message"), `Account '${username}' created! Click Log In below.`, true);
-          }, 600);
+          if (result.requires_verification) {
+            setPipelineStep(2, "active");
+            $("reg-inputs-step").style.display = "none";
+            $("reg-otp-step").style.display = "block";
+            $("reg-otp-email").textContent = email;
+            $("reg-otp-code").value = "";
+            $("btn-otp-autofill").onclick = () => {
+              $("reg-otp-code").value = result.simulated_otp;
+            };
+            showMessage(msg, `Secondary confirmation code sent to ${email} (Demo code: ${result.simulated_otp})`, true);
+          } else {
+            setPipelineStep(3, "success");
+            showMessage(msg, "Account created! You can now log in.", true);
+            quickFill(username);
+            renderSavedAccounts();
+            setTimeout(() => {
+              setAuthMode("login");
+              showMessage($("login-message"), `Account '${username}' created! Click Log In below.`, true);
+            }, 600);
+          }
         } else {
           setPipelineStep(3, "failure");
           if (result.error === "user_exists") {
@@ -1970,6 +2166,135 @@
       regBtn.disabled = false;
       regBtn.innerHTML = originalHtml;
     }
+
+    // Point 6: Secondary Email OTP Verification
+    $("btn-verify-otp").addEventListener("click", async () => {
+      const username = $("reg-username").value.trim();
+      const code = $("reg-otp-code").value.trim();
+      const msg = $("reg-message");
+      if (!code) return showMessage(msg, "Enter the 6-digit confirmation code.", false);
+
+      setPipelineStep(3, "active");
+      try {
+        const res = await ZP.verifyRegistration(username, code);
+        if (res.ok) {
+          setPipelineStep(3, "success");
+          showMessage(msg, "Registration & secondary verification complete! Switching to Sign In...", true);
+          quickFill(username);
+          renderSavedAccounts();
+          setTimeout(() => {
+            cancelOtpStep();
+            setAuthMode("login");
+            showMessage($("login-message"), `Account '${username}' verified! Click Log In below.`, true);
+          }, 800);
+        } else {
+          setPipelineStep(3, "failure");
+          showMessage(msg, res.message || "Invalid confirmation code.", false);
+        }
+      } catch (err) {
+        setPipelineStep(3, "failure");
+        showMessage(msg, "Error: " + err.message, false);
+      }
+    });
+
+    function cancelOtpStep() {
+      $("reg-inputs-step").style.display = "block";
+      $("reg-otp-step").style.display = "none";
+      resetPipeline();
+    }
+
+    // Point 7: AES-256-GCM Encrypted Storage at Rest Audit
+    async function loadEncryptedStorageAudit() {
+      const container = $("encrypted-storage-preview");
+      if (!container) return;
+      container.innerHTML = '<span style="color:#64748b;">Querying encrypted database ledger...</span>';
+      try {
+        const token = sessionStorage.getItem("zp_token");
+        const res = await fetch("/action/history", {
+          headers: { "Authorization": "Bearer " + token }
+        });
+        const data = await res.json();
+        if (data.ok && data.history && data.history.length > 0) {
+          container.innerHTML = "";
+          data.history.forEach(item => {
+            const div = document.createElement("div");
+            div.style.marginBottom = "6px";
+            div.style.padding = "6px";
+            div.style.background = "rgba(255,255,255,0.02)";
+            div.style.borderRadius = "4px";
+            div.style.border = "1px solid rgba(255,255,255,0.05)";
+            div.innerHTML = `
+              <div style="display:flex;justify-content:space-between;color:#fff;font-weight:600;font-size:12px;">
+                <span>${item.action.toUpperCase()}</span>
+                <span style="color:var(--green);font-size:11px;">AES-256-GCM Encrypted</span>
+              </div>
+              <div style="color:var(--red);font-size:11px;word-break:break-all;margin:2px 0;">
+                <span style="color:var(--text-dim);">DB At-Rest:</span> ${item.raw_encrypted_at_rest}
+              </div>
+              <div style="color:var(--cyan);font-size:11.5px;">
+                <span style="color:var(--text-dim);">Decrypted:</span> ${item.decrypted}
+              </div>
+            `;
+            container.appendChild(div);
+          });
+        } else {
+          container.innerHTML = '<span style="color:#64748b;">No sensitive actions recorded yet. Perform an email change or funds transfer above to create AES-256-GCM encrypted records!</span>';
+        }
+      } catch (e) {
+        container.innerHTML = `<span style="color:var(--red);">Failed loading audit: ${e.message}</span>`;
+      }
+    }
+
+    // Point 5: Real-Time Anomaly Detection Status Polling
+    async function fetchSecurityStatus() {
+      try {
+        const res = await fetch("/security/status");
+        const data = await res.json();
+        if (!data.ok) return;
+
+        if ($("anomaly-stat-total")) $("anomaly-stat-total").textContent = data.total_24h || 0;
+        if ($("anomaly-stat-high")) $("anomaly-stat-high").textContent = data.high_severity_24h || 0;
+        if ($("anomaly-stat-blocked")) $("anomaly-stat-blocked").textContent = data.active_blocks || 0;
+
+        const badgeStatus = $("anomaly-badge-status");
+        if (badgeStatus) {
+          if (data.active_blocks > 0) {
+            badgeStatus.innerHTML = `<span class="badge-pill blocked" style="font-size:12px;">⚠️ ${data.active_blocks} Active Quarantine Lockouts</span>`;
+          } else if (data.high_severity_24h > 0) {
+            badgeStatus.innerHTML = `<span class="badge-pill" style="font-size:12px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);color:#fcd34d;">${data.high_severity_24h} Anomalies Flagged</span>`;
+          } else {
+            badgeStatus.innerHTML = `<span class="badge-pill allowed" style="font-size:12px;">0 Active Blocks • Normal</span>`;
+          }
+        }
+
+        const stream = $("anomaly-event-stream");
+        if (stream && data.events) {
+          if (data.events.length === 0) {
+            stream.innerHTML = '<div style="color:#64748b;text-align:center;padding:8px 0;">No security anomaly events recorded yet.</div>';
+          } else {
+            stream.innerHTML = "";
+            data.events.forEach(ev => {
+              const row = document.createElement("div");
+              row.className = "wire-row";
+              const isHigh = ev.severity === "HIGH" || ev.severity === "CRITICAL";
+              row.innerHTML = `
+                <div class="wire-meta">
+                  <span class="wire-method" style="background:${isHigh ? 'rgba(244,63,94,0.2)' : 'rgba(245,158,11,0.2)'};color:${isHigh ? 'var(--red)' : 'var(--amber)'};">${ev.severity}</span>
+                  <span class="wire-path">${ev.event_type} (${ev.username || 'anonymous'} @ ${ev.ip_address})</span>
+                  <span class="wire-status ${isHigh ? 'err' : 'ok'}">${new Date(ev.timestamp * 1000).toLocaleTimeString()}</span>
+                </div>
+                <div class="wire-detail" style="font-size:11px;color:var(--text-muted);margin-top:2px;">${ev.details}</div>
+              `;
+              stream.appendChild(row);
+            });
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Auto-refresh security anomalies
+    setInterval(fetchSecurityStatus, 8000);
+    fetchSecurityStatus();
 
     $("login-button").addEventListener("click", performLogin);
     $("login-username").addEventListener("keydown", (e) => {
@@ -2108,6 +2433,7 @@
           setPipelineStep(3, "success");
           showMessage(msgEl, res.message, true);
           addActivity(`Action approved: ${pendingActionData.action}`, true);
+          loadEncryptedStorageAudit();
         } else {
           setPipelineStep(3, "failure");
           showMessage(msgEl, res.error ? `${res.message} [${res.error}]` : res.message, false);

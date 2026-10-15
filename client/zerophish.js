@@ -103,16 +103,39 @@ const ZP = (() => {
   }
 
   // Full registration: make keys -> send PUBLIC key to server -> keep PRIVATE key here.
-  // Always use extractable=true so keys are persistently backed up in both IndexedDB and localStorage.
-  async function register(username, demoMode = true) {
+  // Supports optional secondary email verification check.
+  async function register(username, email = null, demoMode = true) {
     const { publicKey, privateKey } = await generateKeyPair(true);
+    const payload = { username, public_key: await exportPublicKey(publicKey) };
+    if (email) payload.email = email;
     const response = await fetch("/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, public_key: await exportPublicKey(publicKey) }),
+      body: JSON.stringify(payload),
     });
     const result = await response.json();
-    if (result.ok) await saveKey(username, privateKey);
+    if (result.ok) {
+      if (result.requires_verification) {
+        window._pendingRegKey = { username, privateKey };
+      } else {
+        await saveKey(username, privateKey);
+      }
+    }
+    return result;
+  }
+
+  // Point 6: Complete secondary registration check with confirmation code
+  async function verifyRegistration(username, code) {
+    const response = await fetch("/register/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, code }),
+    });
+    const result = await response.json();
+    if (result.ok && window._pendingRegKey && window._pendingRegKey.username === username) {
+      await saveKey(username, window._pendingRegKey.privateKey);
+      delete window._pendingRegKey;
+    }
     return result;
   }
 
@@ -207,7 +230,7 @@ const ZP = (() => {
 
   return {
     toBase64, generateKeyPair, exportPublicKey, saveKey, loadKey,
-    register, signMessage, login, currentUser, logout,
+    register, verifyRegistration, signMessage, login, currentUser, logout,
     exportDemoKey, importDemoKey,
   };
 })();

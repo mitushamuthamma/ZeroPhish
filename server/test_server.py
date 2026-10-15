@@ -148,5 +148,45 @@ app.config["ACTION_CHALLENGE_TTL"] = 30
 check("expired action challenge rejected",
       code(confirm(n, alice.sign(f"{n}|{REAL}|transfer_funds|500"), "transfer_funds", "500")) == "challenge_expired")
 
+print("\nBeyond Login (Points 3, 5, 6, 7)")
+
+# Point 7: Data at rest encryption
+import sqlite3
+test_db = sqlite3.connect(app.config["DATABASE"])
+row = test_db.execute("SELECT details FROM action_log WHERE username='alice' ORDER BY id DESC LIMIT 1").fetchone()
+check("sensitive action details stored ENCRYPTED with AES-256-GCM (starts with enc:v1:)",
+      row is not None and row[0].startswith("enc:v1:"))
+test_db.close()
+
+hist_resp = client.get("/action/history", headers=auth).get_json()
+check("/action/history correctly decrypts on-the-fly for authorized session",
+      hist_resp.get("ok") and len(hist_resp["history"]) > 0 and hist_resp["history"][0]["decrypted"] == "new@mail.com")
+
+# Point 6: Secondary registration check (email confirmation)
+bob = FakeBrowser("bob_sec")
+reg_secondary = client.post("/register", json={
+    "username": "bob_sec",
+    "email": "bob@example.com",
+    "public_key": bob.public_key_b64()
+}).get_json()
+check("registration with email issues secondary confirmation challenge",
+      reg_secondary.get("ok") and reg_secondary.get("requires_verification") and "simulated_otp" in reg_secondary)
+
+otp = reg_secondary["simulated_otp"]
+check("invalid secondary confirmation code rejected",
+      client.post("/register/verify", json={"username": "bob_sec", "code": "000000"}).status_code == 401)
+check("valid secondary confirmation code completes registration",
+      client.post("/register/verify", json={"username": "bob_sec", "code": otp}).status_code == 201)
+
+# Point 3: Key-bound session
+me_resp = client.get("/me", headers=auth).get_json()
+check("session is actively bound to verified public key",
+      me_resp.get("ok") and me_resp.get("key_bound") is True)
+
+# Point 5: Anomaly detection telemetry
+sec_status = client.get("/security/status").get_json()
+check("anomaly telemetry tracks security events and audit trail",
+      sec_status.get("ok") and sec_status.get("total_24h") > 0 and len(sec_status.get("events")) > 0)
+
 print(f"\n{passed} passed, {failed} failed\n")
 sys.exit(1 if failed else 0)
